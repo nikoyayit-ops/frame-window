@@ -5,6 +5,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/ui/GeodeUI.hpp>
+#include <Geode/utils/async.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -438,7 +439,7 @@ bool cbfActive() {
 // Everything a run needs, kept between trials.
 struct Session {
     Macro macro;
-    std::vector<Ref<PlayerCheckpoint>> checkpoints;  // one per click, saved just before it
+    std::vector<Ref<CheckpointObject>> checkpoints;  // one per click, saved just before it
 };
 
 Session g_session;
@@ -455,14 +456,14 @@ bool prepareSession(PlayLayer* pl, Session& s) {
     auto const& clicks = s.macro.clicks;
     if (clicks.empty()) return false;
 
-    s.checkpoints.assign(clicks.size(), Ref<PlayerCheckpoint>());
+    s.checkpoints.assign(clicks.size(), Ref<CheckpointObject>());
     pl->resetLevel();
 
     size_t next = 0;
     int64_t last = clicks.back().frame;
     for (int64_t f = 0; f <= last; ++f) {
         for (size_t k = next; k < clicks.size() && clicks[k].frame == f; ++k) {
-            if (clicks[k].down) s.checkpoints[k] = Ref<PlayerCheckpoint>(pl->createCheckpoint());
+            if (clicks[k].down) s.checkpoints[k] = Ref<CheckpointObject>(pl->createCheckpoint());
         }
         while (next < clicks.size() && clicks[next].frame == f) {
             pl->handleButton(clicks[next].down, static_cast<int>(PlayerButton::Jump), true);
@@ -558,13 +559,15 @@ CCMenuItemSpriteExtra* makeButton(char const* text, float width, float height,
     return button;
 }
 
-class FrameWindowPopup : public Popup<> {
+class FrameWindowPopup : public Popup {
     fw::Macro m_macro;
     bool m_hasMacro = false;
     CCLabelBMFont* m_status = nullptr;
-    EventListener<Task<Result<std::filesystem::path>>> m_pickListener;
+    async::TaskHolder<Result<std::optional<std::filesystem::path>>> m_pickTask;
 
-    bool setup() override {
+    bool initPopup() {
+        if (!Popup::init(380.f, 480.f)) return false;
+
         auto size = m_mainLayer->getContentSize();
         float w = size.width;
         float h = size.height;
@@ -696,16 +699,17 @@ class FrameWindowPopup : public Popup<> {
         file::FilePickOptions options;
         options.filters.push_back({ "Geometry Dash replay", { "*.gdr" } });
 
-        m_pickListener.bind([this](Task<Result<std::filesystem::path>>::Event* event) {
-            if (auto* result = event->getValue()) {
-                if (result->isOk()) {
-                    this->loadMacro(result->unwrap());
-                } else {
-                    this->toast(result->unwrapErr(), NotificationIcon::Error);
+        m_pickTask.spawn(
+            file::pick(file::PickMode::OpenFile, options),
+            [this](Result<std::optional<std::filesystem::path>> result) {
+                if (result.isErr()) {
+                    this->toast(result.unwrapErr(), NotificationIcon::Error);
+                    return;
                 }
+                auto picked = result.unwrap();
+                if (picked) this->loadMacro(*picked);  // empty means the user cancelled
             }
-        });
-        m_pickListener.setFilter(file::pick(file::PickMode::OpenFile, options));
+        );
     }
 
     void loadMacro(std::filesystem::path const& path) {
@@ -724,11 +728,11 @@ class FrameWindowPopup : public Popup<> {
 public:
     static FrameWindowPopup* create() {
         auto ret = new FrameWindowPopup();
-        if (ret && ret->initAnchored(380.f, 480.f)) {
+        if (ret->initPopup()) {
             ret->autorelease();
             return ret;
         }
-        CC_SAFE_DELETE(ret);
+        delete ret;
         return nullptr;
     }
 };
@@ -746,7 +750,7 @@ void openFrameWindow() {
 // Ctrl + Right Alt opens the menu.
 class $modify(FWKeyboard, CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat) {
-        if (down && !repeat && key == KEY_RightAlt && this->getControlKeyPressed()) {
+        if (down && !repeat && key == static_cast<enumKeyCodes>(165) && this->getControlKeyPressed()) {
             openFrameWindow();
             return true;
         }
