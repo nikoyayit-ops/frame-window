@@ -1,12 +1,12 @@
 {
-  "geode": "5.3.2",
+  "geode": "5.11.2",
   "gd": {
     "win": "2.2081",
     "android": "2.2081",
     "mac": "2.2081",
     "ios": "2.2081"
   },
-  "version": "1.2.0",
+  "version": "1.2.1",
   "id": "snoww.frame-window",
   "name": "Frame Window",
   "developer": "Snoww",
