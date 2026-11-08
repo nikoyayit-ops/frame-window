@@ -566,7 +566,15 @@ class FrameWindowPopup : public Popup {
     async::TaskHolder<Result<std::optional<std::filesystem::path>>> m_pickTask;
 
     bool initPopup() {
-        if (!Popup::init(380.f, 480.f)) return false;
+        // Proportions follow the reference menu: tight buttons, a small break before Save Macro.
+        constexpr float kPopupW   = 360.f;
+        constexpr float kPopupH   = 330.f;
+        constexpr float kBtnW     = 250.f;
+        constexpr float kBtnH     = 30.f;
+        constexpr float kGap      = 4.f;    // between buttons
+        constexpr float kGroupGap = 10.f;   // extra space before Save Macro
+
+        if (!Popup::init(kPopupW, kPopupH)) return false;
 
         auto size = m_mainLayer->getContentSize();
         float w = size.width;
@@ -574,35 +582,47 @@ class FrameWindowPopup : public Popup {
 
         auto title = CCLabelBMFont::create("Frame Window", "goldFont.fnt");
         title->setColor(fw::kRed);
-        title->setPosition({ w / 2, h - 40.f });
+        title->setScale(0.8f);
+        title->setPosition({ w / 2, h - 26.f });
         m_mainLayer->addChild(title);
 
         m_status = CCLabelBMFont::create("No recording yet", "chatFont.fnt");
-        m_status->setPosition({ w / 2, h - 88.f });
+        m_status->setScale(0.8f);
+        m_status->setPosition({ w / 2, h - 54.f });
         m_mainLayer->addChild(m_status);
 
         auto menu = CCMenu::create();
         menu->setPosition({ 0.f, 0.f });
         m_mainLayer->addChild(menu);
 
-        float y = h - 130.f;
-        addMenuButton(menu, "Start Recording", { w / 2, y }, menu_selector(FrameWindowPopup::onUnfinished)); y -= 50.f;
-        addMenuButton(menu, "Run Analysis",    { w / 2, y }, menu_selector(FrameWindowPopup::onRunAnalysis)); y -= 50.f;
-        addMenuButton(menu, "Playback",        { w / 2, y }, menu_selector(FrameWindowPopup::onPlayback));    y -= 50.f;
-        addMenuButton(menu, "Save Macro",      { w / 2, y }, menu_selector(FrameWindowPopup::onUnfinished)); y -= 50.f;
-        addMenuButton(menu, "Saved Macros",    { w / 2, y }, menu_selector(FrameWindowPopup::onUnfinished)); y -= 50.f;
-        addMenuButton(menu, "Settings",        { w / 2, y }, menu_selector(FrameWindowPopup::onSettings));
+        // Every button is placed from the top edge of the first one.
+        float y = h - 72.f - kBtnH / 2;
+        auto place = [&](char const* text, SEL_MenuHandler sel, float extraGapBefore = 0.f) {
+            y -= extraGapBefore;
+            auto btn = makeButton(text, kBtnW, kBtnH, this, sel);
+            btn->setPosition({ w / 2, y });
+            menu->addChild(btn);
+            y -= kBtnH + kGap;
+        };
+        place("Start Recording", menu_selector(FrameWindowPopup::onUnfinished));
+        place("Run Analysis",    menu_selector(FrameWindowPopup::onRunAnalysis));
+        place("Playback",        menu_selector(FrameWindowPopup::onPlayback));
+        place("Save Macro",      menu_selector(FrameWindowPopup::onUnfinished), kGroupGap);
+        place("Saved Macros",    menu_selector(FrameWindowPopup::onUnfinished));
+        place("Settings",        menu_selector(FrameWindowPopup::onSettings));
 
         auto author = CCLabelBMFont::create("by Snoww", "chatFont.fnt");
+        author->setScale(0.7f);
         author->setOpacity(160);
         author->setAnchorPoint({ 0.f, 0.5f });
-        author->setPosition({ 30.f, 30.f });
+        author->setPosition({ 24.f, 20.f });
         m_mainLayer->addChild(author);
 
         auto importLabel = CCLabelBMFont::create("Import Macro", "chatFont.fnt");
+        importLabel->setScale(0.7f);
         importLabel->setColor(fw::kBlue);
         auto importBtn = CCMenuItemSpriteExtra::create(importLabel, this, menu_selector(FrameWindowPopup::onImportMacro));
-        importBtn->setPosition({ w - 80.f, 30.f });
+        importBtn->setPosition({ w - 70.f, 20.f });
         menu->addChild(importBtn);
 
         return true;
