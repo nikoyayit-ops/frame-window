@@ -529,7 +529,7 @@ void drawWindowLabels(PlayLayer* pl, Session const& s, std::vector<PressWindow> 
         auto label = CCLabelBMFont::create(text.c_str(), "bigFont.fnt");
         label->setScale(0.5f);
         label->setColor(w.frames < 3.0 ? kRed : kWhite);
-        label->setPosition({ it->x, it->y + 24.f });
+        label->setPosition({ static_cast<float>(it->x), static_cast<float>(it->y) + 24.f });
         layer->addChild(label);
     }
     pl->m_objectLayer->addChild(layer);
@@ -749,11 +749,11 @@ void openFrameWindow() {
 
 // Ctrl + Right Alt opens the menu.
 class $modify(FWKeyboard, CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double timestamp) {
         if (down && !repeat && key == static_cast<enumKeyCodes>(165) && this->getControlKeyPressed()) {
             openFrameWindow();
             return true;
         }
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat);
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, timestamp);
     }
 };
